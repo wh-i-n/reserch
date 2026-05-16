@@ -1,6 +1,8 @@
 # srwks. JAPAN TOUR Day 1 (2026-05-16 SHIBUYA LUSH) 出演者
 # https://livepocket.jp/e/srwkstokyo1
-79eB9q0lo6UaYUNgYNAbqp  # srwks. (Thailand)
-22596Y1hah6u7PlGUiJ7BZ  # AprilBlue / エイプリルブルー
-5sp9TRLcb2ooWZG7XRY6c4  # Beachside talks
-1pfSAdbaYwRontpr916mmr  # Moon In June
+#
+# Format: <artist_id> [all|top:N]   # comment
+79eB9q0lo6UaYUNgYNAbqp all     # srwks. (Thailand) — headliner, full discography
+22596Y1hah6u7PlGUiJ7BZ top:12  # AprilBlue / エイプリルブルー
+5sp9TRLcb2ooWZG7XRY6c4 top:12  # Beachside talks
+1pfSAdbaYwRontpr916mmr top:12  # Moon In June

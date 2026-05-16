@@ -1,19 +1,20 @@
 """Create a public Spotify playlist from a set of artists.
 
-Reads `artists.txt` (one Spotify artist ID per line, lines starting with `#`
-are treated as comments) and either dumps every track or picks the most
-popular ones across all listed artists in round-robin order.
+Reads `artists.txt`. Each non-comment line is:
+
+    <artist_id_or_url>  [mode]  [# optional comment]
+
+where `mode` is one of:
+    all          — include every credited track
+    top:N        — include the N most popular tracks
+    (omitted)    — falls back to --default-top
 
 Usage:
     export SPOTIPY_CLIENT_ID=...
     export SPOTIPY_CLIENT_SECRET=...
     export SPOTIPY_REDIRECT_URI=http://127.0.0.1:8888/callback
 
-    # every track:
-    python create_artist_playlist.py --name "出演者全曲"
-
-    # top 50 popular tracks, evenly distributed:
-    python create_artist_playlist.py --name "出演者ベスト50" --top 50
+    python create_artist_playlist.py --name "出演者プレイリスト" --default-top 12
 """
 
 from __future__ import annotations
@@ -21,6 +22,7 @@ from __future__ import annotations
 import argparse
 import re
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 
 import spotipy
@@ -31,18 +33,38 @@ ALBUM_GROUPS = "album,single,compilation"
 MARKET = "JP"
 
 
-def load_artist_ids(path: Path) -> list[str]:
-    ids: list[str] = []
+@dataclass
+class ArtistSpec:
+    artist_id: str
+    mode: str  # "all" or "top"
+    top_n: int  # only used when mode == "top"
+
+
+def parse_artists_file(path: Path, default_top: int) -> list[ArtistSpec]:
+    specs: list[ArtistSpec] = []
     for raw in path.read_text(encoding="utf-8").splitlines():
-        line = raw.strip()
-        if not line or line.startswith("#"):
+        body = raw.split("#", 1)[0].strip()
+        if not body:
             continue
-        match = re.search(r"(?:artist[/:])?([0-9A-Za-z]{22})", line)
-        if not match:
-            print(f"warn: skipping unparseable line: {line!r}", file=sys.stderr)
+        tokens = body.split()
+        id_match = re.search(r"(?:artist[/:])?([0-9A-Za-z]{22})", tokens[0])
+        if not id_match:
+            print(f"warn: skipping unparseable line: {raw!r}", file=sys.stderr)
             continue
-        ids.append(match.group(1))
-    return ids
+        artist_id = id_match.group(1)
+        mode = "top"
+        top_n = default_top
+        if len(tokens) >= 2:
+            spec = tokens[1].lower()
+            if spec == "all":
+                mode = "all"
+            elif spec.startswith("top:"):
+                mode = "top"
+                top_n = int(spec.split(":", 1)[1])
+            else:
+                print(f"warn: unknown mode {spec!r} on line {raw!r}", file=sys.stderr)
+        specs.append(ArtistSpec(artist_id=artist_id, mode=mode, top_n=top_n))
+    return specs
 
 
 def all_pages(sp: spotipy.Spotify, first):
@@ -60,17 +82,13 @@ def collect_album_ids(sp: spotipy.Spotify, artist_id: str) -> list[str]:
         country=MARKET,
         limit=50,
     )
-    seen: set[str] = set()
-    for album in all_pages(sp, first):
-        seen.add(album["id"])
-    return list(seen)
+    return list({album["id"] for album in all_pages(sp, first)})
 
 
 def collect_track_ids(
     sp: spotipy.Spotify, album_ids: list[str], artist_id: str
 ) -> list[tuple[str, str]]:
-    """Return (track_id, dedupe_key) for tracks on the given albums where
-    the artist appears as a credited artist."""
+    """Return (track_id, dedupe_key) for tracks credited to the artist."""
     results: list[tuple[str, str]] = []
     seen_keys: set[str] = set()
     for i in range(0, len(album_ids), 20):
@@ -90,9 +108,7 @@ def collect_track_ids(
     return results
 
 
-def hydrate_popularity(
-    sp: spotipy.Spotify, track_ids: list[str]
-) -> dict[str, int]:
+def hydrate_popularity(sp: spotipy.Spotify, track_ids: list[str]) -> dict[str, int]:
     out: dict[str, int] = {}
     for i in range(0, len(track_ids), 50):
         chunk = track_ids[i : i + 50]
@@ -118,14 +134,13 @@ def main() -> int:
         "--file",
         type=Path,
         default=Path("artists.txt"),
-        help="Path to a text file with one Spotify artist ID (or URL) per line",
+        help="Path to a text file with one Spotify artist ID per line",
     )
     parser.add_argument(
-        "--top",
+        "--default-top",
         type=int,
-        default=0,
-        help="If >0, keep only this many tracks total, picking the most "
-        "popular per artist round-robin",
+        default=10,
+        help="Fallback top-N for artists with no explicit mode",
     )
     args = parser.parse_args()
 
@@ -133,52 +148,40 @@ def main() -> int:
         print(f"error: {args.file} not found", file=sys.stderr)
         return 1
 
-    artist_ids = load_artist_ids(args.file)
-    if not artist_ids:
+    specs = parse_artists_file(args.file, args.default_top)
+    if not specs:
         print("error: no artist IDs found", file=sys.stderr)
         return 1
 
     sp = spotipy.Spotify(auth_manager=SpotifyOAuth(scope=SCOPE))
     me = sp.current_user()
 
-    per_artist: list[tuple[str, list[str]]] = []
+    track_uris: list[str] = []
+    seen_uris: set[str] = set()
 
-    for artist_id in artist_ids:
-        artist = sp.artist(artist_id)
-        print(f"\n# {artist['name']} ({artist_id})")
-        album_ids = collect_album_ids(sp, artist_id)
+    for spec in specs:
+        artist = sp.artist(spec.artist_id)
+        mode_label = "all" if spec.mode == "all" else f"top:{spec.top_n}"
+        print(f"\n# {artist['name']} ({spec.artist_id}) [{mode_label}]")
+
+        album_ids = collect_album_ids(sp, spec.artist_id)
         print(f"  albums: {len(album_ids)}")
-        tracks = collect_track_ids(sp, album_ids, artist_id)
+        tracks = collect_track_ids(sp, album_ids, spec.artist_id)
         print(f"  unique tracks: {len(tracks)}")
 
-        if args.top > 0:
+        if spec.mode == "top":
             track_ids = [tid for tid, _ in tracks]
             pop = hydrate_popularity(sp, track_ids)
             tracks.sort(key=lambda x: pop.get(x[0], 0), reverse=True)
+            tracks = tracks[: spec.top_n]
+            print(f"  keeping top {len(tracks)} by popularity")
 
-        per_artist.append((artist["name"], [f"spotify:track:{tid}" for tid, _ in tracks]))
-
-    if args.top > 0:
-        chosen: list[str] = []
-        seen: set[str] = set()
-        i = 0
-        while len(chosen) < args.top and any(i < len(uris) for _, uris in per_artist):
-            for name, uris in per_artist:
-                if len(chosen) >= args.top:
-                    break
-                if i < len(uris) and uris[i] not in seen:
-                    chosen.append(uris[i])
-                    seen.add(uris[i])
-            i += 1
-        track_uris = chosen
-    else:
-        track_uris = []
-        seen = set()
-        for _, uris in per_artist:
-            for uri in uris:
-                if uri not in seen:
-                    seen.add(uri)
-                    track_uris.append(uri)
+        for tid, _ in tracks:
+            uri = f"spotify:track:{tid}"
+            if uri in seen_uris:
+                continue
+            seen_uris.add(uri)
+            track_uris.append(uri)
 
     playlist = sp.user_playlist_create(
         user=me["id"],
@@ -191,7 +194,7 @@ def main() -> int:
     for batch in chunked(track_uris, 100):
         sp.playlist_add_items(playlist["id"], batch)
 
-    print(f"added {len(track_uris)} tracks across {len(artist_ids)} artists")
+    print(f"added {len(track_uris)} tracks total")
     return 0
 
 

@@ -1,0 +1,9 @@
+# One query per line. Format examples:
+#   Bohemian Rhapsody Queen
+#   Lemon 米津玄師
+#   Shape of You - Ed Sheeran
+Bohemian Rhapsody Queen
+Imagine John Lennon
+Hotel California Eagles
+Smells Like Teen Spirit Nirvana
+Billie Jean Michael Jackson

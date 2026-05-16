@@ -1,14 +1,19 @@
-"""Create a public Spotify playlist containing every track by a set of artists.
+"""Create a public Spotify playlist from a set of artists.
 
 Reads `artists.txt` (one Spotify artist ID per line, lines starting with `#`
-are treated as comments), gathers every album / single / compilation, then
-adds every unique track to a new public playlist.
+are treated as comments) and either dumps every track or picks the most
+popular ones across all listed artists in round-robin order.
 
 Usage:
     export SPOTIPY_CLIENT_ID=...
     export SPOTIPY_CLIENT_SECRET=...
     export SPOTIPY_REDIRECT_URI=http://127.0.0.1:8888/callback
-    python create_artist_playlist.py --name "srwks. JAPAN TOUR Day1 出演者全曲"
+
+    # every track:
+    python create_artist_playlist.py --name "出演者全曲"
+
+    # top 50 popular tracks, evenly distributed:
+    python create_artist_playlist.py --name "出演者ベスト50" --top 50
 """
 
 from __future__ import annotations
@@ -57,17 +62,17 @@ def collect_album_ids(sp: spotipy.Spotify, artist_id: str) -> list[str]:
     )
     seen: set[str] = set()
     for album in all_pages(sp, first):
-        if album["id"] not in seen:
-            seen.add(album["id"])
+        seen.add(album["id"])
     return list(seen)
 
 
-def collect_track_uris(
+def collect_track_ids(
     sp: spotipy.Spotify, album_ids: list[str], artist_id: str
 ) -> list[tuple[str, str]]:
-    """Return (track_uri, dedupe_key) for every track on the given albums
-    where the artist appears as a credited artist."""
+    """Return (track_id, dedupe_key) for tracks on the given albums where
+    the artist appears as a credited artist."""
     results: list[tuple[str, str]] = []
+    seen_keys: set[str] = set()
     for i in range(0, len(album_ids), 20):
         batch = album_ids[i : i + 20]
         albums = sp.albums(batch, market=MARKET)["albums"]
@@ -77,10 +82,25 @@ def collect_track_uris(
             for track in album["tracks"]["items"]:
                 if not any(a["id"] == artist_id for a in track["artists"]):
                     continue
-                name = track["name"].lower()
-                key = re.sub(r"\s+", " ", name).strip()
-                results.append((track["uri"], key))
+                key = re.sub(r"\s+", " ", track["name"].lower()).strip()
+                if key in seen_keys:
+                    continue
+                seen_keys.add(key)
+                results.append((track["id"], key))
     return results
+
+
+def hydrate_popularity(
+    sp: spotipy.Spotify, track_ids: list[str]
+) -> dict[str, int]:
+    out: dict[str, int] = {}
+    for i in range(0, len(track_ids), 50):
+        chunk = track_ids[i : i + 50]
+        for t in sp.tracks(chunk, market=MARKET)["tracks"]:
+            if t is None:
+                continue
+            out[t["id"]] = t.get("popularity", 0)
+    return out
 
 
 def chunked(seq: list[str], size: int):
@@ -89,7 +109,9 @@ def chunked(seq: list[str], size: int):
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Create a public Spotify playlist of every track by listed artists.")
+    parser = argparse.ArgumentParser(
+        description="Create a public Spotify playlist from listed artists."
+    )
     parser.add_argument("--name", required=True, help="Playlist name")
     parser.add_argument("--description", default="", help="Playlist description")
     parser.add_argument(
@@ -97,6 +119,13 @@ def main() -> int:
         type=Path,
         default=Path("artists.txt"),
         help="Path to a text file with one Spotify artist ID (or URL) per line",
+    )
+    parser.add_argument(
+        "--top",
+        type=int,
+        default=0,
+        help="If >0, keep only this many tracks total, picking the most "
+        "popular per artist round-robin",
     )
     args = parser.parse_args()
 
@@ -112,21 +141,44 @@ def main() -> int:
     sp = spotipy.Spotify(auth_manager=SpotifyOAuth(scope=SCOPE))
     me = sp.current_user()
 
-    track_uris: list[str] = []
-    seen_keys: set[str] = set()
+    per_artist: list[tuple[str, list[str]]] = []
 
     for artist_id in artist_ids:
         artist = sp.artist(artist_id)
         print(f"\n# {artist['name']} ({artist_id})")
         album_ids = collect_album_ids(sp, artist_id)
         print(f"  albums: {len(album_ids)}")
-        for uri, key in collect_track_uris(sp, album_ids, artist_id):
-            dedupe = f"{artist_id}::{key}"
-            if dedupe in seen_keys:
-                continue
-            seen_keys.add(dedupe)
-            track_uris.append(uri)
-        print(f"  total unique tracks so far: {len(track_uris)}")
+        tracks = collect_track_ids(sp, album_ids, artist_id)
+        print(f"  unique tracks: {len(tracks)}")
+
+        if args.top > 0:
+            track_ids = [tid for tid, _ in tracks]
+            pop = hydrate_popularity(sp, track_ids)
+            tracks.sort(key=lambda x: pop.get(x[0], 0), reverse=True)
+
+        per_artist.append((artist["name"], [f"spotify:track:{tid}" for tid, _ in tracks]))
+
+    if args.top > 0:
+        chosen: list[str] = []
+        seen: set[str] = set()
+        i = 0
+        while len(chosen) < args.top and any(i < len(uris) for _, uris in per_artist):
+            for name, uris in per_artist:
+                if len(chosen) >= args.top:
+                    break
+                if i < len(uris) and uris[i] not in seen:
+                    chosen.append(uris[i])
+                    seen.add(uris[i])
+            i += 1
+        track_uris = chosen
+    else:
+        track_uris = []
+        seen = set()
+        for _, uris in per_artist:
+            for uri in uris:
+                if uri not in seen:
+                    seen.add(uri)
+                    track_uris.append(uri)
 
     playlist = sp.user_playlist_create(
         user=me["id"],

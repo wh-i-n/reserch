@@ -10,16 +10,22 @@ where `mode` is one of:
     (omitted)    — falls back to --default-top
 
 Usage:
+    # interactive (developer machine, opens a browser once):
     export SPOTIPY_CLIENT_ID=...
     export SPOTIPY_CLIENT_SECRET=...
     export SPOTIPY_REDIRECT_URI=http://127.0.0.1:8888/callback
-
     python create_artist_playlist.py --name "出演者プレイリスト" --default-top 12
+
+    # headless (cloud / Android-driven Claude sessions): also set
+    # SPOTIPY_REFRESH_TOKEN. Obtain it from the `.cache` file produced by the
+    # interactive run above.
+    export SPOTIPY_REFRESH_TOKEN=AQA...
 """
 
 from __future__ import annotations
 
 import argparse
+import os
 import re
 import sys
 from dataclasses import dataclass
@@ -31,6 +37,33 @@ from spotipy.oauth2 import SpotifyOAuth
 SCOPE = "playlist-modify-public"
 ALBUM_GROUPS = "album,single,compilation"
 MARKET = "JP"
+
+
+def build_spotify_client() -> spotipy.Spotify:
+    """Authenticate against Spotify.
+
+    Headless mode: if SPOTIPY_REFRESH_TOKEN is set, refresh an access token
+    directly — no browser, suitable for cloud/CI runs.
+
+    Interactive mode: fall back to SpotifyOAuth's full code flow, which spins
+    up a local callback server. Use this on a developer machine the first time
+    to obtain the refresh token (read it out of `.cache` afterwards).
+    """
+    refresh_token = os.environ.get("SPOTIPY_REFRESH_TOKEN")
+    if refresh_token:
+        client_id = os.environ["SPOTIPY_CLIENT_ID"]
+        client_secret = os.environ["SPOTIPY_CLIENT_SECRET"]
+        oauth = SpotifyOAuth(
+            client_id=client_id,
+            client_secret=client_secret,
+            redirect_uri=os.environ.get(
+                "SPOTIPY_REDIRECT_URI", "http://127.0.0.1:8888/callback"
+            ),
+            scope=SCOPE,
+        )
+        token_info = oauth.refresh_access_token(refresh_token)
+        return spotipy.Spotify(auth=token_info["access_token"])
+    return spotipy.Spotify(auth_manager=SpotifyOAuth(scope=SCOPE))
 
 
 @dataclass
@@ -153,7 +186,7 @@ def main() -> int:
         print("error: no artist IDs found", file=sys.stderr)
         return 1
 
-    sp = spotipy.Spotify(auth_manager=SpotifyOAuth(scope=SCOPE))
+    sp = build_spotify_client()
     me = sp.current_user()
 
     track_uris: list[str] = []

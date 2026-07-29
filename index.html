@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CUTIE STREET | LuckyFes'26</title>
+<style>
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  body {
+    font-family: "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Noto Sans JP", "Yu Gothic", Meiryo, sans-serif;
+    background: #fff;
+    color: #1a1a1a;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .ticket {
+    max-width: 640px;
+    margin: 0 auto;
+    background: #fff;
+  }
+
+  /* ---- アーティスト写真 ---- */
+  .hero img {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+
+  /* ---- 公演情報 ---- */
+  .show-info {
+    text-align: center;
+    padding: 28px 24px 30px;
+  }
+
+  .show-info .inner {
+    display: inline-block;
+    text-align: left;
+  }
+
+  .artist-name {
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    margin-bottom: 18px;
+  }
+
+  .show-datetime,
+  .show-stage {
+    font-size: 24px;
+    font-weight: 700;
+    line-height: 1.45;
+  }
+
+  /* ---- 破線区切り ---- */
+  .dashed-divider {
+    border: none;
+    border-top: 3px dashed #c9c9c9;
+    margin: 4px 0 0;
+  }
+
+  /* ---- 整理番号 ---- */
+  .entry-number {
+    text-align: center;
+    padding: 34px 24px 40px;
+  }
+
+  .entry-number .label {
+    font-size: 22px;
+    color: #8a8a8e;
+    margin-bottom: 14px;
+  }
+
+  .entry-number .number {
+    font-size: 44px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+  }
+
+  /* ---- PASSバナー ---- */
+  .pass-banner img {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+
+  /* ---- 入場ルール ---- */
+  .rules {
+    background: #eaefef;
+    border-radius: 14px;
+    margin: 30px 16px 40px;
+    padding: 26px 24px 30px;
+  }
+
+  .rules h2 {
+    font-size: 22px;
+    font-weight: 700;
+    margin-bottom: 14px;
+  }
+
+  .rules p {
+    font-size: 17px;
+    line-height: 1.75;
+  }
+
+  /* ---- 同行者情報 ---- */
+  .holder {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 10px 20px 28px;
+    border-bottom: 1px solid #e5e5e5;
+  }
+
+  .holder .avatar {
+    width: 62px;
+    height: 62px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .holder .texts {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .holder .ticket-type {
+    font-size: 16px;
+    margin-bottom: 6px;
+  }
+
+  .holder .name-line {
+    font-size: 16px;
+    color: #8a8a8e;
+  }
+
+  .holder .name {
+    font-size: 26px;
+    font-weight: 700;
+    color: #1a1a1a;
+    margin-left: 4px;
+  }
+
+  .holder .menu-dots {
+    color: #9a9a9a;
+    font-size: 22px;
+    letter-spacing: 2px;
+    align-self: flex-start;
+    padding-top: 14px;
+    flex-shrink: 0;
+  }
+</style>
+</head>
+<body>
+  <div class="ticket">
+
+    <!-- アーティスト写真 -->
+    <div class="hero">
+      <img src="images/hero.png" alt="CUTIE STREET">
+    </div>
+
+    <!-- 公演情報 -->
+    <section class="show-info">
+      <div class="inner">
+        <h1 class="artist-name">CUTIE STREET</h1>
+        <div class="show-datetime">08.09 日, 15:35-</div>
+        <div class="show-stage">WING STAGE</div>
+      </div>
+    </section>
+
+    <hr class="dashed-divider">
+
+    <!-- 整理番号 -->
+    <section class="entry-number">
+      <div class="label">整理番号</div>
+      <div class="number">0320 番台</div>
+    </section>
+
+    <!-- PASSバナー -->
+    <div class="pass-banner">
+      <img src="images/banner.png" alt="LuckyFes'26 PASS">
+    </div>
+
+    <!-- 入場ルール -->
+    <section class="rules">
+      <h2>入場ルール</h2>
+      <p>
+        ① 当該アーティスト開演45分前(ガーデンステージは30分前より、前方エリア優先入場待機エリアを開放致します。お持ちの「前方エリア優先入場券」に記載された整理番号に対応するレーン及び整理番号の記載された待機場所にてお待ちください。<br>
+        ② 優先入場待機エリアのレーンは整理番号毎に200番単位で別れており、各レーン入口にて「前方エリア優先入場券」を確認させていただきます。<br>
+        ③ 当該アーティスト開演15分前より、整理番号順に前方エリア内へと入場を開始致します。入場開始時刻までに優先入場待機エリア内の整理番号に対応した待機場所にてお待ちください。<br>
+        ※前方エリア優先入場券の整理番号は、1名ずつ異なる番号ではなく、10名単位のブロック番号で表示されます。<br>
+        例:「10番台」「20番台」「30番台」…のように表示され、同じ整理番号が10名に表示されます。誘導の際に10人単位で誘導した方がスムーズにご入場頂ける、との現場からの提案に従い改善しました。<br>
+        ※ 異なる整理番号をお持ちの同行者と一緒に入場されたい場合は後ろの番号に合わせてご入場ください。<br>
+        ※ 各STAGE横の「前方エリア優先入場待機エリア」については後日エリアマップで案内します。<br>
+        ※ 入場開始時刻が近づくにつれて混雑が予想されます。お時間に余裕をもってお集まりください。<br>
+        ※ ご入場開始時に不在の場合でも、入場は可能です。<br>
+        ※ 当日の状況をみて、前方エリア優先入場券購入者が前方エリア内に入った後にスペースに余裕がある場合は、過去出演アーティストからの要望や盛況感の演出を踏まえ、前方エリア優先入場券未購入の方にも、公演開始直前に前方エリア内へ誘導しますので、予めご了承ください。
+      </p>
+    </section>
+
+    <!-- 同行者情報 -->
+    <section class="holder">
+      <img class="avatar" src="images/avatar.png" alt="">
+      <div class="texts">
+        <div class="ticket-type">各日入場券(9日)</div>
+        <div class="name-line">同行者<span class="name">西牟田 直</span></div>
+      </div>
+      <div class="menu-dots">&#8226;&#8226;&#8226;</div>
+    </section>
+
+  </div>
+</body>
+</html>
